@@ -1,0 +1,139 @@
+import customtkinter as ctk
+from tkinter import messagebox
+import requests
+from PIL import Image, ImageTk
+import io
+import time
+
+# ============ CONFIG ============
+ctk.set_appearance_mode("Dark")  # Options: "System", "Dark", "Light"
+ctk.set_default_color_theme("blue")
+
+API_KEY = "06c921750b9a82d8f5d1294e1586276f"
+BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+
+
+# ============ FUNCTIONS ============
+def get_weather():
+    city = city_entry.get().strip()
+    if not city:
+        messagebox.showinfo("Input Required", "Please enter a city name.")
+        return
+
+    weather_label.configure(text="Fetching...")
+    temp_label.configure(text="")
+    details_label.configure(text="")
+    icon_label.configure(image="")
+
+    try:
+        params = {"q": city, "appid": API_KEY, "units": "metric"}
+        response = requests.get(BASE_URL, params=params)
+        data = response.json()
+
+        if response.status_code != 200:
+            raise Exception(data.get("message", "City not found"))
+
+        show_weather(data)
+
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+        weather_label.configure(text="")
+
+
+def show_weather(data):
+    condition = data["weather"][0]["main"]
+    description = data["weather"][0]["description"].title()
+    temp = round(data["main"]["temp"])
+    min_temp = round(data["main"]["temp_min"])
+    max_temp = round(data["main"]["temp_max"])
+    humidity = data["main"]["humidity"]
+    wind = data["wind"]["speed"]
+    country = data["sys"]["country"]
+    city = data["name"]
+
+    # Set weather icon
+    icon_code = data["weather"][0]["icon"]
+    icon_url = f"http://openweathermap.org/img/wn/{icon_code}@2x.png"
+    icon_img = Image.open(io.BytesIO(requests.get(icon_url).content))
+    icon_img = icon_img.resize((90, 90))
+    icon_photo = ImageTk.PhotoImage(icon_img)
+    icon_label.configure(image=icon_photo)
+    icon_label.image = icon_photo
+
+    # Update text
+    city_label.configure(text=f"{city}, {country}")
+    weather_label.configure(text=f"{condition} • {description}")
+    temp_label.configure(text=f"{temp}°C")
+
+    details_label.configure(
+        text=f"Min: {min_temp}°C   Max: {max_temp}°C\n"
+             f"Humidity: {humidity}%   Wind: {wind} m/s"
+    )
+
+    last_updated.configure(text=f"Last updated: {time.strftime('%I:%M %p')}")
+
+
+# ============ UI ============
+app = ctk.CTk()
+app.title("Weather App")
+app.geometry("420x550")
+app.resizable(False, False)
+
+# --- Title ---
+header = ctk.CTkLabel(
+    app, text="Weather Now ☁️",
+    font=ctk.CTkFont(size=26, weight="bold")
+)
+header.pack(pady=(25, 5))
+
+subtitle = ctk.CTkLabel(
+    app, text="Simple • Fast • Reliable",
+    font=ctk.CTkFont(size=14, slant="italic"),
+    text_color=("gray70", "gray60")
+)
+subtitle.pack(pady=(0, 15))
+
+# --- Input Field ---
+input_frame = ctk.CTkFrame(app, corner_radius=10)
+input_frame.pack(pady=10, padx=30, fill="x")
+
+city_entry = ctk.CTkEntry(input_frame, placeholder_text="Enter city name", font=ctk.CTkFont(size=18))
+city_entry.pack(side="left", expand=True, fill="x", padx=(10, 5), pady=10)
+city_entry.bind("<Return>", lambda e: get_weather())
+
+search_btn = ctk.CTkButton(input_frame, text="Search", width=90, command=get_weather)
+search_btn.pack(side="right", padx=(5, 10), pady=10)
+
+# --- Weather Display ---
+city_label = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=20, weight="bold"))
+city_label.pack(pady=(25, 5))
+
+icon_label = ctk.CTkLabel(app, text="")
+icon_label.pack(pady=(5, 5))
+
+weather_label = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=18))
+weather_label.pack(pady=5)
+
+temp_label = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=64, weight="bold"))
+temp_label.pack(pady=10)
+
+details_label = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=16))
+details_label.pack(pady=(5, 20))
+
+# --- Footer / Clock ---
+last_updated = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=13), text_color="gray")
+last_updated.pack(pady=(10, 5))
+
+
+def update_clock():
+    clock_time = time.strftime('%I:%M:%S %p')
+    clock_label.configure(text=f"🕒 {clock_time}")
+    app.after(1000, update_clock)
+
+
+clock_label = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=13), text_color="gray60")
+clock_label.pack(pady=(5, 20))
+update_clock()
+
+# Run app
+app.mainloop()
